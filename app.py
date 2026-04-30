@@ -2,8 +2,15 @@ from flask import Flask, render_template
 from flask_socketio import SocketIO, emit
 import os
 import threading
-from pynput import keyboard
 import socket
+
+# Keyboard shortcut might fail on headless servers (like Render)
+try:
+    from pynput import keyboard
+    HAS_KEYBOARD = True
+except (ImportError, Exception):
+    HAS_KEYBOARD = False
+    print("⚠️ Keyboard monitoring disabled (not supported on this platform)")
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
@@ -80,9 +87,15 @@ def start_keyboard_listener():
         h.join()
 
 if __name__ == '__main__':
-    # Start keyboard listener in a background thread
-    kb_thread = threading.Thread(target=start_keyboard_listener, daemon=True)
-    kb_thread.start()
+    # Start keyboard listener in a background thread if supported
+    if HAS_KEYBOARD:
+        try:
+            kb_thread = threading.Thread(target=start_keyboard_listener, daemon=True)
+            kb_thread.start()
+        except Exception as e:
+            print(f"⚠️ Could not start keyboard listener: {e}")
+    else:
+        print("ℹ️ Skipping keyboard listener (Platform not supported)")
 
     my_ip = get_ip()
     print(f"\n" + "="*50)
