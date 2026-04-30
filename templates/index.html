@@ -124,21 +124,58 @@
         document.getElementById('signInBtn').addEventListener('click', async () => {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-            if (!email || !password) return alert('Enter email and password');
+            const btn = document.getElementById('signInBtn');
             
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) authStatus.innerText = error.message;
-            else setupSession(data.user);
+            if (!email || !password) return alert('Please enter both email and password');
+            
+            btn.innerText = 'Signing In...';
+            btn.disabled = true;
+            authStatus.innerText = '';
+
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) {
+                    authStatus.innerText = "Error: " + error.message;
+                    console.error(error);
+                } else {
+                    setupSession(data.user);
+                }
+            } catch (err) {
+                authStatus.innerText = "Connection Error. Check your internet.";
+                console.error(err);
+            } finally {
+                btn.innerText = 'Sign In';
+                btn.disabled = false;
+            }
         });
 
         document.getElementById('signUpBtn').addEventListener('click', async () => {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-            if (!email || !password) return alert('Enter email and password');
+            const btn = document.getElementById('signUpBtn');
+
+            if (!email || !password) return alert('Please enter both email and password');
             
-            const { data, error } = await supabase.auth.signUp({ email, password });
-            if (error) authStatus.innerText = error.message;
-            else alert('Check your email for the confirmation link!');
+            btn.innerText = 'Signing Up...';
+            btn.disabled = true;
+            authStatus.innerText = '';
+
+            try {
+                const { data, error } = await supabase.auth.signUp({ email, password });
+                if (error) {
+                    authStatus.innerText = "Error: " + error.message;
+                } else if (data.user && data.session) {
+                    setupSession(data.user);
+                } else {
+                    authStatus.innerText = "Success! Please check your email to confirm.";
+                    authStatus.style.color = "#4ade80";
+                }
+            } catch (err) {
+                authStatus.innerText = "Connection Error.";
+            } finally {
+                btn.innerText = 'Sign Up';
+                btn.disabled = false;
+            }
         });
 
         document.getElementById('logoutBtn').addEventListener('click', async () => {
