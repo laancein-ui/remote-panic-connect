@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panic Control | Remote Alarm</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+</head>
+<body>
+    <!-- Auth Overlay -->
+    <div id="auth-overlay" class="auth-overlay">
+        <div class="glass-card">
+            <h1>Panic Connect</h1>
+            <p>Sign in with your account to link your devices securely.</p>
+            <div id="auth-container">
+                <button id="googleLogin" class="google-btn">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+                    Continue with Google
+                </button>
+                <div class="divider"><span>OR</span></div>
+                <input type="email" id="email" placeholder="Email Address">
+                <button id="magicLink" class="secondary-btn">Send Magic Link</button>
+            </div>
+            <p class="status-msg" id="authStatus"></p>
+        </div>
+    </div>
+
+    <div id="main-content" class="container hidden">
+        <div class="glass-card">
+            <div class="header-actions">
+                <button id="settingsBtn" class="icon-btn">⚙️</button>
+                <button id="logoutBtn" class="icon-btn">Logout</button>
+            </div>
+
+            <h1>Panic Control</h1>
+            
+            <div class="input-group">
+                <label>Device Identity</label>
+                <input type="text" id="compName" placeholder="This Computer Name">
+            </div>
+
+            <div class="input-group">
+                <label>Custom Message / Instruction</label>
+                <textarea id="instruction" placeholder="e.g. Ring Alarm! or Call me now!"></textarea>
+            </div>
+
+            <button id="triggerBtn" class="trigger-btn">
+                Trigger
+            </button>
+
+            <div class="status">
+                <div id="statusDot" class="dot offline"></div>
+                <span id="statusText">Connecting...</span>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal hidden">
+            <div class="modal-content glass-card">
+                <h2>Settings</h2>
+                <div class="setting-item">
+                    <span>Account:</span>
+                    <span id="userEmail" class="dim"></span>
+                </div>
+                <div class="setting-item">
+                    <span>Active Room:</span>
+                    <span id="roomId" class="dim"></span>
+                </div>
+                <button id="closeSettings" class="secondary-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Supabase Configuration (Placeholder - User should fill these)
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const socket = io();
+        const authOverlay = document.getElementById('auth-overlay');
+        const mainContent = document.getElementById('main-content');
+        const triggerBtn = document.getElementById('triggerBtn');
+        const compNameInput = document.getElementById('compName');
+        const instructionInput = document.getElementById('instruction');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        
+        let currentUser = null;
+
+        // Check Auth State
+        async function checkUser() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setupSession(user);
+            } else {
+                authOverlay.classList.remove('hidden');
+                mainContent.classList.add('hidden');
+            }
+        }
+
+        function setupSession(user) {
+            currentUser = user;
+            authOverlay.classList.add('hidden');
+            mainContent.classList.remove('hidden');
+            document.getElementById('userEmail').innerText = user.email;
+            document.getElementById('roomId').innerText = user.id.substring(0, 8) + '...';
+            
+            // Join the room for this user
+            socket.emit('join_room', { room: user.id });
+            
+            localStorage.setItem('lastUser', user.email);
+            compNameInput.value = localStorage.getItem('compName') || 'Computer ' + Math.floor(Math.random() * 100);
+        }
+
+        // Auth Listeners
+        document.getElementById('googleLogin').addEventListener('click', async () => {
+            await supabase.auth.signInWithOAuth({ provider: 'google' });
+        });
+
+        document.getElementById('magicLink').addEventListener('click', async () => {
+            const email = document.getElementById('email').value;
+            if (!email) return alert('Enter email');
+            const { error } = await supabase.auth.signInWithOtp({ email });
+            if (error) alert(error.message);
+            else alert('Check your email for the magic link!');
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await supabase.auth.signOut();
+            location.reload();
+        });
+
+        // Socket Status
+        socket.on('connect', () => {
+            statusDot.classList.remove('offline');
+            statusText.innerText = 'System Ready';
+            if (currentUser) socket.emit('join_room', { room: currentUser.id });
+        });
+
+        socket.on('disconnect', () => {
+            statusDot.classList.add('offline');
+            statusText.innerText = 'Disconnected';
+        });
+
+        // Action
+        triggerBtn.addEventListener('click', () => {
+            if (!currentUser) return;
+            
+            const name = compNameInput.value || 'Anonymous Computer';
+            const msg = instructionInput.value || 'ALARM_ACTIVATED';
+            localStorage.setItem('compName', name);
+            
+            socket.emit('trigger_alarm', { 
+                room: currentUser.id,
+                timestamp: new Date().getTime(),
+                computer_name: name,
+                instruction: msg
+            });
+            
+            triggerBtn.style.transform = 'scale(0.9)';
+            setTimeout(() => triggerBtn.style.transform = 'scale(1)', 100);
+        });
+
+        // Modal Logic
+        document.getElementById('settingsBtn').addEventListener('click', () => {
+            document.getElementById('settings-modal').classList.remove('hidden');
+        });
+        document.getElementById('closeSettings').addEventListener('click', () => {
+            document.getElementById('settings-modal').classList.add('hidden');
+        });
+
+        checkUser();
+    </script>
+</body>
+</html>

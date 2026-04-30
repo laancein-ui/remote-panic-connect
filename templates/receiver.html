@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alarm Receiver | Remote Alarm</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+</head>
+<body>
+    <!-- Auth Overlay (Receiver must also log in) -->
+    <div id="auth-overlay" class="auth-overlay">
+        <div class="glass-card">
+            <h1>Receiver Login</h1>
+            <p>Connect this phone to your account to receive alerts.</p>
+            <button id="googleLogin" class="google-btn">Continue with Google</button>
+            <p class="status-msg" id="authStatus"></p>
+        </div>
+    </div>
+
+    <!-- Unlock screen to bypass browser autoplay restrictions -->
+    <div id="unlock-screen" class="hidden">
+        <div class="glass-card">
+            <h1>Receiver Mode</h1>
+            <p>To enable the alarm sound, please tap the button below.</p>
+            <button id="unlockBtn" class="unlock-btn">Enable Alarm System</button>
+        </div>
+    </div>
+
+    <div id="main-content" class="container hidden">
+        <div class="glass-card">
+            <h1 id="alarm-title">Receiver Active</h1>
+            <p id="alarm-msg">Waiting for remote signal...</p>
+            
+            <div id="visual-alert" class="trigger-btn" style="cursor: default; animation: none;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+
+            <div class="status">
+                <div id="statusDot" class="dot offline"></div>
+                <span id="statusText">Connecting...</span>
+            </div>
+
+            <button id="stopBtn" class="unlock-btn hidden" style="background: #ef4444; margin-top: 2rem;">Stop Alarm</button>
+        </div>
+    </div>
+
+    <!-- Hidden Audio Element -->
+    <audio id="alarmSound" loop>
+        <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+
+    <script>
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const socket = io();
+        const authOverlay = document.getElementById('auth-overlay');
+        const unlockScreen = document.getElementById('unlock-screen');
+        const unlockBtn = document.getElementById('unlockBtn');
+        const mainContent = document.getElementById('main-content');
+        const alarmSound = document.getElementById('alarmSound');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const alarmTitle = document.getElementById('alarm-title');
+        const alarmMsg = document.getElementById('alarm-msg');
+        const visualAlert = document.getElementById('visual-alert');
+        const stopBtn = document.getElementById('stopBtn');
+
+        let isAlarmOn = false;
+        let currentUser = null;
+
+        async function checkUser() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setupReceiver(user);
+            } else {
+                authOverlay.classList.remove('hidden');
+            }
+        }
+
+        function setupReceiver(user) {
+            currentUser = user;
+            authOverlay.classList.add('hidden');
+            unlockScreen.classList.remove('hidden');
+            socket.emit('join_room', { room: user.id });
+        }
+
+        document.getElementById('googleLogin').addEventListener('click', async () => {
+            await supabase.auth.signInWithOAuth({ provider: 'google' });
+        });
+
+        // Unlock audio context on user gesture
+        unlockBtn.addEventListener('click', () => {
+            alarmSound.play().then(() => {
+                alarmSound.pause();
+                alarmSound.currentTime = 0;
+                unlockScreen.classList.add('hidden');
+                mainContent.classList.remove('hidden');
+            }).catch(err => {
+                console.error("Audio unlock failed:", err);
+            });
+        });
+
+        socket.on('connect', () => {
+            statusDot.classList.remove('offline');
+            statusText.innerText = 'Connected & Monitoring';
+            if (currentUser) socket.emit('join_room', { room: currentUser.id });
+        });
+
+        socket.on('disconnect', () => {
+            statusDot.classList.add('offline');
+            statusText.innerText = 'Disconnected';
+        });
+
+        socket.on('alarm_event', (data) => {
+            if (!isAlarmOn) {
+                const triggerSource = data.computer_name || 'Remote Device';
+                const instruction = data.message || 'ALARM_ACTIVATED';
+                triggerAlarm(triggerSource, instruction);
+            }
+        });
+
+        function triggerAlarm(sourceName, instruction) {
+            isAlarmOn = true;
+            document.body.classList.add('alarm-active');
+            alarmTitle.innerText = instruction === 'ALARM_ACTIVATED' ? "ALARM TRIGGERED!" : instruction;
+            alarmTitle.style.color = "#ff4d4d";
+            alarmMsg.innerText = "Triggered by: " + sourceName;
+            visualAlert.style.animation = "pulse 1s infinite";
+            stopBtn.classList.remove('hidden');
+            
+            alarmSound.play();
+            
+            if (navigator.vibrate) {
+                navigator.vibrate([500, 200, 500, 200, 500]);
+            }
+        }
+
+        stopBtn.addEventListener('click', () => {
+            isAlarmOn = false;
+            document.body.classList.remove('alarm-active');
+            alarmTitle.innerText = "Receiver Active";
+            alarmTitle.style.color = "inherit";
+            alarmMsg.innerText = "Waiting for remote signal...";
+            visualAlert.style.animation = "none";
+            stopBtn.classList.add('hidden');
+            
+            alarmSound.pause();
+            alarmSound.currentTime = 0;
+        });
+
+        checkUser();
+    </script>
+</body>
+</html>
