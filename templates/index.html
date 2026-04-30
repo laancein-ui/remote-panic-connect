@@ -13,17 +13,22 @@
     <div id="auth-overlay" class="auth-overlay">
         <div class="glass-card">
             <h1>Panic Connect</h1>
-            <p>Sign in with your account to link your devices securely.</p>
+            <p>Enter your credentials to link your devices.</p>
             <div id="auth-container">
-                <button id="googleLogin" class="google-btn">
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
-                    Continue with Google
-                </button>
-                <div class="divider"><span>OR</span></div>
-                <input type="email" id="email" placeholder="Email Address">
-                <button id="magicLink" class="secondary-btn">Send Magic Link</button>
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="email" placeholder="email@example.com">
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="password" placeholder="••••••••">
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 1rem;">
+                    <button id="signInBtn" class="google-btn" style="background: var(--primary); color: white; margin-bottom: 0;">Sign In</button>
+                    <button id="signUpBtn" class="secondary-btn">Sign Up</button>
+                </div>
             </div>
-            <p class="status-msg" id="authStatus"></p>
+            <p class="status-msg" id="authStatus" style="margin-top: 1rem; font-size: 0.8rem; color: #ff4d4d;"></p>
         </div>
     </div>
 
@@ -74,9 +79,9 @@
     </div>
 
     <script>
-        // Supabase Configuration (Placeholder - User should fill these)
-        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+        // Supabase Configuration
+        const SUPABASE_URL = 'https://neubyyonujujxegrkjly.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_IcZLB0A5s3niBlim0SLWug_nODoReoI';
         const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         const socket = io();
@@ -87,6 +92,7 @@
         const instructionInput = document.getElementById('instruction');
         const statusDot = document.getElementById('statusDot');
         const statusText = document.getElementById('statusText');
+        const authStatus = document.getElementById('authStatus');
         
         let currentUser = null;
 
@@ -108,7 +114,6 @@
             document.getElementById('userEmail').innerText = user.email;
             document.getElementById('roomId').innerText = user.id.substring(0, 8) + '...';
             
-            // Join the room for this user
             socket.emit('join_room', { room: user.id });
             
             localStorage.setItem('lastUser', user.email);
@@ -116,16 +121,24 @@
         }
 
         // Auth Listeners
-        document.getElementById('googleLogin').addEventListener('click', async () => {
-            await supabase.auth.signInWithOAuth({ provider: 'google' });
+        document.getElementById('signInBtn').addEventListener('click', async () => {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            if (!email || !password) return alert('Enter email and password');
+            
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) authStatus.innerText = error.message;
+            else setupSession(data.user);
         });
 
-        document.getElementById('magicLink').addEventListener('click', async () => {
+        document.getElementById('signUpBtn').addEventListener('click', async () => {
             const email = document.getElementById('email').value;
-            if (!email) return alert('Enter email');
-            const { error } = await supabase.auth.signInWithOtp({ email });
-            if (error) alert(error.message);
-            else alert('Check your email for the magic link!');
+            const password = document.getElementById('password').value;
+            if (!email || !password) return alert('Enter email and password');
+            
+            const { data, error } = await supabase.auth.signUp({ email, password });
+            if (error) authStatus.innerText = error.message;
+            else alert('Check your email for the confirmation link!');
         });
 
         document.getElementById('logoutBtn').addEventListener('click', async () => {
