@@ -13,13 +13,19 @@
     <div id="auth-overlay" class="auth-overlay">
         <div class="glass-card">
             <h1>Panic Connect</h1>
-            <p>Enter your credentials to link your devices.</p>
+            <p>Create your unique identity to sync devices.</p>
+            
             <div id="auth-container">
                 <button id="googleLogin" class="google-btn">
                     <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
                     Continue with Google
                 </button>
                 <div class="divider"><span>OR</span></div>
+                
+                <div id="username-field" class="input-group">
+                    <label>Unique Username</label>
+                    <input type="text" id="reg-username" placeholder="e.g. Hero_01">
+                </div>
                 <div class="input-group">
                     <label>Email</label>
                     <input type="email" id="email" placeholder="email@example.com">
@@ -28,29 +34,42 @@
                     <label>Password</label>
                     <input type="password" id="password" placeholder="••••••••">
                 </div>
+                
                 <div style="display: flex; gap: 10px; margin-top: 1rem;">
-                    <button id="signInBtn" class="google-btn" style="background: var(--primary); color: white; margin-bottom: 0;">Sign In</button>
-                    <button id="signUpBtn" class="secondary-btn">Sign Up</button>
+                    <button id="signInBtn" class="google-btn" style="background: var(--primary); color: white; margin-bottom: 0; flex: 1;">Sign In</button>
+                    <button id="signUpBtn" class="secondary-btn" style="flex: 1;">Sign Up</button>
                 </div>
             </div>
-            <p class="status-msg" id="authStatus" style="margin-top: 1rem; font-size: 0.8rem; color: #ff4d4d;"></p>
+            <p class="status-msg" id="authStatus" style="margin-top: 1.5rem; font-size: 0.9rem; color: #ff4d4d; font-weight: 600;"></p>
+        </div>
+    </div>
+
+    <!-- Username Setup Overlay (For Google/Existing Users without a username) -->
+    <div id="username-overlay" class="auth-overlay hidden">
+        <div class="glass-card">
+            <h1>Set Username</h1>
+            <p>Almost there! Please choose a unique username for your account.</p>
+            <div class="input-group">
+                <input type="text" id="new-username" placeholder="Pick a username">
+            </div>
+            <button id="saveUsernameBtn" class="google-btn" style="background: var(--primary); color: white;">Save & Continue</button>
         </div>
     </div>
 
     <div id="main-content" class="container hidden">
         <div class="glass-card">
             <div class="header-actions">
-                <button id="settingsBtn" class="icon-btn">⚙️</button>
-                <button id="logoutBtn" class="icon-btn">Logout</button>
+                <div class="user-badge">
+                    <span id="displayUsername">User</span>
+                </div>
+                <div>
+                    <button id="settingsBtn" class="icon-btn">⚙️</button>
+                    <button id="logoutBtn" class="icon-btn">Logout</button>
+                </div>
             </div>
 
             <h1>Panic Control</h1>
             
-            <div class="input-group">
-                <label>Device Identity</label>
-                <input type="text" id="compName" placeholder="This Computer Name">
-            </div>
-
             <div class="input-group">
                 <label>Custom Message / Instruction</label>
                 <textarea id="instruction" placeholder="e.g. Ring Alarm! or Call me now!"></textarea>
@@ -75,6 +94,10 @@
                     <span id="userEmail" class="dim"></span>
                 </div>
                 <div class="setting-item">
+                    <span>Username:</span>
+                    <span id="settingUsername" class="dim"></span>
+                </div>
+                <div class="setting-item">
                     <span>Active Room:</span>
                     <span id="roomId" class="dim"></span>
                 </div>
@@ -87,13 +110,19 @@
         // Supabase Configuration
         const SUPABASE_URL = 'https://neubyyonujujxegrkjly.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_IcZLB0A5s3niBlim0SLWug_nODoReoI';
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        let supabaseClient;
+        try {
+            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        } catch(e) {
+            console.error("Supabase Init Failed", e);
+        }
 
         const socket = io();
         const authOverlay = document.getElementById('auth-overlay');
+        const usernameOverlay = document.getElementById('username-overlay');
         const mainContent = document.getElementById('main-content');
         const triggerBtn = document.getElementById('triggerBtn');
-        const compNameInput = document.getElementById('compName');
         const instructionInput = document.getElementById('instruction');
         const statusDot = document.getElementById('statusDot');
         const statusText = document.getElementById('statusText');
@@ -103,9 +132,15 @@
 
         // Check Auth State
         async function checkUser() {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { user } } = await supabaseClient.auth.getUser();
             if (user) {
-                setupSession(user);
+                const username = user.user_metadata.username;
+                if (!username) {
+                    authOverlay.classList.add('hidden');
+                    usernameOverlay.classList.remove('hidden');
+                } else {
+                    setupSession(user);
+                }
             } else {
                 authOverlay.classList.remove('hidden');
                 mainContent.classList.add('hidden');
@@ -114,83 +149,89 @@
 
         function setupSession(user) {
             currentUser = user;
+            const username = user.user_metadata.username || "User";
+            
             authOverlay.classList.add('hidden');
+            usernameOverlay.classList.add('hidden');
             mainContent.classList.remove('hidden');
+            
             document.getElementById('userEmail').innerText = user.email;
+            document.getElementById('displayUsername').innerText = username;
+            document.getElementById('settingUsername').innerText = username;
             document.getElementById('roomId').innerText = user.id.substring(0, 8) + '...';
             
             socket.emit('join_room', { room: user.id });
-            
-            localStorage.setItem('lastUser', user.email);
-            compNameInput.value = localStorage.getItem('compName') || 'Computer ' + Math.floor(Math.random() * 100);
         }
 
         // Auth Listeners
-        document.getElementById('googleLogin').addEventListener('click', async () => {
-            const { error } = await supabase.auth.signInWithOAuth({ 
-                provider: 'google',
-                options: {
-                    redirectTo: window.location.origin
-                }
-            });
-            if (error) authStatus.innerText = "Google Error: " + error.message;
-        });
-
         document.getElementById('signInBtn').addEventListener('click', async () => {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const btn = document.getElementById('signInBtn');
             
-            if (!email || !password) return alert('Please enter both email and password');
+            if (!email || !password) return alert('Enter email and password');
             
-            btn.innerText = 'Signing In...';
+            btn.innerText = 'Connecting...';
             btn.disabled = true;
             authStatus.innerText = '';
 
-            try {
-                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-                if (error) {
-                    authStatus.innerText = "Error: " + error.message;
-                    console.error(error);
-                } else {
-                    setupSession(data.user);
-                }
-            } catch (err) {
-                authStatus.innerText = "Connection Error. Check your internet.";
-                console.error(err);
-            } finally {
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            
+            if (error) {
+                authStatus.innerText = error.message;
                 btn.innerText = 'Sign In';
                 btn.disabled = false;
+            } else {
+                checkUser();
             }
         });
 
         document.getElementById('signUpBtn').addEventListener('click', async () => {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
+            const username = document.getElementById('reg-username').value;
             const btn = document.getElementById('signUpBtn');
 
-            if (!email || !password) return alert('Please enter both email and password');
+            if (!email || !password || !username) return alert('Fill all fields (Username, Email, Password)');
             
-            btn.innerText = 'Signing Up...';
+            btn.innerText = 'Creating Account...';
             btn.disabled = true;
             authStatus.innerText = '';
 
-            try {
-                const { data, error } = await supabase.auth.signUp({ email, password });
-                if (error) {
-                    authStatus.innerText = "Error: " + error.message;
-                } else if (data.user && data.session) {
-                    setupSession(data.user);
-                } else {
-                    authStatus.innerText = "Success! Please check your email to confirm.";
-                    authStatus.style.color = "#4ade80";
-                }
-            } catch (err) {
-                authStatus.innerText = "Connection Error.";
-            } finally {
+            const { data, error } = await supabaseClient.auth.signUp({ 
+                email, 
+                password,
+                options: { data: { username: username } }
+            });
+
+            if (error) {
+                authStatus.innerText = error.message;
                 btn.innerText = 'Sign Up';
                 btn.disabled = false;
+            } else {
+                authStatus.innerText = "Check email to confirm, then Sign In!";
+                authStatus.style.color = "#4ade80";
+                btn.innerText = 'Success';
             }
+        });
+
+        document.getElementById('saveUsernameBtn').addEventListener('click', async () => {
+            const username = document.getElementById('new-username').value;
+            if (!username) return alert('Enter a username');
+            
+            const { data, error } = await supabaseClient.auth.updateUser({
+                data: { username: username }
+            });
+
+            if (error) alert(error.message);
+            else checkUser();
+        });
+
+        document.getElementById('googleLogin').addEventListener('click', async () => {
+            await supabaseClient.auth.signInWithOAuth({ 
+                provider: 'google',
+                options: { redirectTo: window.location.origin }
+            });
         });
 
         document.getElementById('logoutBtn').addEventListener('click', async () => {

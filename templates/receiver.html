@@ -36,6 +36,9 @@
     <!-- Unlock screen to bypass browser autoplay restrictions -->
     <div id="unlock-screen" class="hidden">
         <div class="glass-card">
+            <div class="user-badge" style="margin-bottom: 1rem;">
+                <span id="receiverUsername">User</span>
+            </div>
             <h1>Receiver Mode</h1>
             <p>To enable the alarm sound, please tap the button below.</p>
             <button id="unlockBtn" class="unlock-btn">Enable Alarm System</button>
@@ -44,6 +47,9 @@
 
     <div id="main-content" class="container hidden">
         <div class="glass-card">
+            <div class="user-badge">
+                <span id="activeUsername">User</span>
+            </div>
             <h1 id="alarm-title">Receiver Active</h1>
             <p id="alarm-msg">Waiting for remote signal...</p>
             
@@ -99,8 +105,14 @@
 
         function setupReceiver(user) {
             currentUser = user;
+            const username = user.user_metadata.username || "User";
+            
             authOverlay.classList.add('hidden');
             unlockScreen.classList.remove('hidden');
+            
+            document.getElementById('receiverUsername').innerText = username;
+            document.getElementById('activeUsername').innerText = username;
+            
             socket.emit('join_room', { room: user.id });
         }
 
