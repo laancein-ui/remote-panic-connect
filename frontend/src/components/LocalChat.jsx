@@ -13,19 +13,34 @@ export default function LocalChat() {
   const [status, setStatus] = useState('Connecting to Local Network...');
   const messagesEndRef = useRef(null);
   
-  const currentUser = JSON.parse(localStorage.getItem('user'));
+  const storedUser = localStorage.getItem('user');
+  const currentUser = storedUser ? JSON.parse(storedUser) : { id: 'anon', name: 'Anonymous' };
 
   useEffect(() => {
     // Connect to the local server running on port 5002 or the deployed Render backend
     // We use window.location.hostname to dynamically target the local IP if VITE_API_URL is not set
-    const serverUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5002`;
+    let serverUrl = import.meta.env.VITE_API_URL;
+    if (!serverUrl) {
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        serverUrl = `http://${window.location.hostname}:5002`;
+      } else {
+        serverUrl = 'https://panic-chat-backend.onrender.com';
+      }
+    }
     const newSocket = io(serverUrl);
     
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
       setStatus('Connected (Local Secure Network)');
-      newSocket.emit('login', { id: currentUser.id, name: currentUser.name });
+      if (currentUser && currentUser.id) {
+        newSocket.emit('login', { id: currentUser.id, name: currentUser.name });
+      }
+    });
+
+    newSocket.on('connect_error', (err) => {
+      console.error('Socket connection error:', err);
+      setStatus('Connecting to Local Network...');
     });
 
     newSocket.on('disconnect', () => {
