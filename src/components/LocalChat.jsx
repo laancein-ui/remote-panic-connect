@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Send, ArrowLeft, Wifi, Paperclip } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
+import localforage from 'localforage';
 
 export default function LocalChat() {
   const [roomCode, setRoomCode] = useState(localStorage.getItem('savedRoomCode') || '');
@@ -20,15 +21,35 @@ export default function LocalChat() {
   const currentUser = JSON.parse(localStorage.getItem('user'));
   const peerId = currentUser.id;
 
+  // Load old messages when joining a room
+  const loadSavedMessages = async (room) => {
+    try {
+      const saved = await localforage.getItem(`local_chat_${room}`);
+      if (saved) {
+        setMessages(saved);
+      }
+    } catch (e) {
+      console.error('Error loading local messages', e);
+    }
+  };
+
+  // Save messages to local storage whenever they change
+  const saveMessageLocal = async (newMsg, currentRoom) => {
+    try {
+      const saved = await localforage.getItem(`local_chat_${currentRoom}`) || [];
+      const updated = [...saved, newMsg];
+      await localforage.setItem(`local_chat_${currentRoom}`, updated);
+    } catch (e) {
+      console.error('Error saving local message', e);
+    }
+  };
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const initWebRTC = (isInitiator, targetPeerId) => {
-    // Only use host candidates to force LAN-only connection. No STUN/TURN servers.
-    peerConnection.current = new RTCPeerConnection({
-      iceServers: [] 
-    });
+    peerConnection.current = new RTCPeerConnection({ iceServers: [] });
 
     peerConnection.current.onicecandidate = (event) => {
       if (event.candidate && event.candidate.candidate.includes('typ host')) {
@@ -70,31 +91,36 @@ export default function LocalChat() {
       setStatus('Connected (Secure LAN)');
     };
     dataChannel.current.onmessage = (event) => {
+      let newMsg;
       if (typeof event.data === 'string') {
-        const msg = JSON.parse(event.data);
-        setMessages(prev => [...prev, msg]);
+        newMsg = JSON.parse(event.data);
       } else {
         const blob = new Blob([event.data]);
         const url = URL.createObjectURL(blob);
-        setMessages(prev => [...prev, {
+        newMsg = {
           sender_id: 'peer',
           type: 'file',
           file_url: url,
           content: 'Received File',
           timestamp: new Date().toISOString()
-        }]);
+        };
       }
+      setMessages(prev => [...prev, newMsg]);
+      saveMessageLocal(newMsg, roomCode.toUpperCase());
     };
   };
 
-  const joinRoom = (e) => {
+  const joinRoom = async (e) => {
     e.preventDefault();
-    if (!roomCode.trim()) return;
-    localStorage.setItem('savedRoomCode', roomCode.toUpperCase());
+    const cleanRoomCode = roomCode.trim().toUpperCase();
+    if (!cleanRoomCode) return;
+    
+    localStorage.setItem('savedRoomCode', cleanRoomCode);
+    await loadSavedMessages(cleanRoomCode);
     setJoined(true);
     setStatus('Waiting for peer...');
 
-    const channelName = `local_room_${roomCode.toUpperCase()}`;
+    const channelName = `local_room_${cleanRoomCode}`;
     signalingChannel.current = supabase.channel(channelName, {
       config: { broadcast: { self: false } }
     });
@@ -132,7 +158,6 @@ export default function LocalChat() {
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          // Announce presence
           signalingChannel.current.send({
             type: 'broadcast',
             event: 'peer_joined',
@@ -156,13 +181,15 @@ export default function LocalChat() {
     if (file) {
       const buffer = await file.arrayBuffer();
       dataChannel.current.send(buffer);
-      setMessages(prev => [...prev, {
+      const newMsg = {
         sender_id: currentUser.id,
         type: 'file',
         file_url: URL.createObjectURL(file),
         content: `Sent File: ${file.name}`,
         timestamp: new Date().toISOString()
-      }]);
+      };
+      setMessages(prev => [...prev, newMsg]);
+      saveMessageLocal(newMsg, roomCode.toUpperCase());
       setFile(null);
     }
 
@@ -176,6 +203,7 @@ export default function LocalChat() {
       };
       dataChannel.current.send(JSON.stringify(msgData));
       setMessages(prev => [...prev, msgData]);
+      saveMessageLocal(msgData, roomCode.toUpperCase());
       setInput('');
     }
   };
