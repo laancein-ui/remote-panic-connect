@@ -55,7 +55,7 @@ function App() {
           vibrate: [300, 100, 300]
         });
       }
-      alert(`⚠️ EMERGENCY ALERT TRIGGERED: Remote trigger activated from linked device on IP ${data.ip} by user ${data.name}!`);
+      alert(`⚠️ EMERGENCY ALERT TRIGGERED for laancein@gmail.com! Remote trigger activated by user ${data.name} on IP ${data.ip}!`);
     });
 
     const handleKeyDown = (e) => {
@@ -64,14 +64,9 @@ function App() {
         const storedUser = localStorage.getItem('user');
         if (!storedUser) return;
         const user = JSON.parse(storedUser);
-        const targetId = localStorage.getItem('linked_target_id');
         
-        // Restore targeted alert handling
-        if (targetId) {
-          bgSocket.emit('panic_trigger_targeted', { userId: user.id, name: user.name, targetId });
-        } else {
-          bgSocket.emit('panic_trigger', { userId: user.id, name: user.name });
-        }
+        // Direct alert strictly to target account laancein@gmail.com
+        bgSocket.emit('panic_trigger_targeted_email', { senderName: user.name || user.email || 'Anonymous' });
       }
     };
 
