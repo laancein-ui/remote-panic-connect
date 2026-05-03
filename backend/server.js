@@ -290,6 +290,20 @@ io.on('connection', (socket) => {
         io.to(`user_${userId}`).emit('panic_alert', { name, ip: clientIp });
     });
 
+    socket.on('panic_trigger_targeted', ({ userId, name, targetId }) => {
+        if (!targetId) return;
+        const clientIp = socket.handshake.address || socket.request.connection?.remoteAddress || '127.0.0.1';
+        
+        const sockets = io.sockets.sockets;
+        for (const [id, s] of sockets.entries()) {
+            const sIp = s.handshake.address || s.request.connection?.remoteAddress || '127.0.0.1';
+            // Match exactly same IP network and target User ID
+            if (s.userId === targetId && sIp === clientIp) {
+                s.emit('panic_alert', { name, ip: clientIp });
+            }
+        }
+    });
+
     socket.on('disconnect', () => {
         const userId = socket.userId;
         if (userId && usersDB.has(userId)) {

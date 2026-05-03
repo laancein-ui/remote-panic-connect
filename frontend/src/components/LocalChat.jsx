@@ -17,6 +17,7 @@ export default function LocalChat() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAvatar, setEditAvatar] = useState('');
+  const [editTargetId, setEditTargetId] = useState(localStorage.getItem('linked_target_id') || '');
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef(null);
@@ -166,6 +167,7 @@ export default function LocalChat() {
     const updated = { ...currentUser, name: editName, avatarUrl: editAvatar };
     setCurrentUser(updated);
     localStorage.setItem('user', JSON.stringify(updated));
+    localStorage.setItem('linked_target_id', editTargetId);
     if (socket) {
       socket.emit('update_profile', { name: editName, avatarUrl: editAvatar });
     }
@@ -295,6 +297,7 @@ export default function LocalChat() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: '700', color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{currentUser.name}</div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{currentUser.email || 'Local user'}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--accent-color)', fontWeight: 'bold', marginTop: '2px' }}>ID: {currentUser.id}</div>
               </div>
               <button onClick={() => setIsEditingProfile(!isEditingProfile)} style={{ background: 'none', border: 'none', color: 'var(--accent-color)', cursor: 'pointer' }} title="Edit Profile">
                 <Edit3 size={18} />
@@ -318,6 +321,14 @@ export default function LocalChat() {
                   value={editAvatar} 
                   onChange={(e) => setEditAvatar(e.target.value)} 
                   placeholder="Avatar URL" 
+                  style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }} 
+                />
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  value={editTargetId} 
+                  onChange={(e) => setEditTargetId(e.target.value)} 
+                  placeholder="Linked Target User ID" 
                   style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }} 
                 />
                 <button type="submit" className="btn btn-primary" style={{ padding: '0.4rem', fontSize: '0.8rem' }}>Save Details</button>

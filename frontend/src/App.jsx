@@ -60,7 +60,12 @@ function App() {
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowDown') {
         e.preventDefault();
-        bgSocket.emit('panic_trigger', { userId: user.id, name: user.name });
+        const targetId = localStorage.getItem('linked_target_id');
+        if (targetId) {
+          bgSocket.emit('panic_trigger_targeted', { userId: user.id, name: user.name, targetId });
+        } else {
+          bgSocket.emit('panic_trigger', { userId: user.id, name: user.name });
+        }
       }
     };
 
