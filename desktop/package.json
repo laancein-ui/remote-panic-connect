@@ -1,0 +1,13 @@
+{
+  "name": "panic-connect-desktop",
+  "version": "1.0.0",
+  "description": "Cross-Platform Background Desktop Application for Real-time Alerts",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "^33.0.0",
+    "socket.io-client": "^4.7.5"
+  }
+}
