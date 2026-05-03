@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import Login from './components/Login';
@@ -15,6 +15,8 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
+  const [panicNotification, setPanicNotification] = useState(null);
+
   useEffect(() => {
     let serverUrl = import.meta.env.VITE_API_URL;
     if (!serverUrl) {
@@ -37,6 +39,10 @@ function App() {
     }, 2000);
 
     bgSocket.on('panic_alert', (data) => {
+      // Create visually rich in-app floating banner
+      setPanicNotification(data);
+      setTimeout(() => setPanicNotification(null), 12000);
+
       try {
         const context = new (window.AudioContext || window.webkitAudioContext)();
         const osc = context.createOscillator();
@@ -55,7 +61,6 @@ function App() {
           vibrate: [300, 100, 300]
         });
       }
-      alert(`⚠️ EMERGENCY ALERT TRIGGERED for laancein@gmail.com! Remote trigger activated by user ${data.name} on IP ${data.ip}!`);
     });
 
     const handleKeyDown = (e) => {
@@ -84,7 +89,45 @@ function App() {
 
   return (
     <Router>
-      <div className="app-container">
+      <div className="app-container" style={{ position: 'relative' }}>
+        {panicNotification && (
+          <div style={{
+            position: 'fixed',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: '#ef4444',
+            color: '#ffffff',
+            padding: '1.25rem 2rem',
+            borderRadius: '16px',
+            boxShadow: '0 12px 40px rgba(239, 68, 68, 0.4)',
+            zIndex: 99999,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.25rem',
+            animation: 'slideDown 0.4s ease-out',
+            border: '2px solid rgba(255,255,255,0.2)',
+            minWidth: '320px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontWeight: '800', fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                🚨 Remote Alert Triggered
+              </div>
+              <button 
+                onClick={() => setPanicNotification(null)}
+                style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: '1.5rem', lineHeight: '1', padding: 0 }}
+              >
+                ×
+              </button>
+            </div>
+            <div style={{ fontSize: '1rem', opacity: 0.95, marginTop: '4px' }}>
+              Triggered by user: <strong>{panicNotification.name}</strong>
+            </div>
+            <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>
+              Network IP: {panicNotification.ip}
+            </div>
+          </div>
+        )}
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/register" element={<Register />} />
