@@ -4,6 +4,8 @@ const dotenv = require('dotenv');
 const { createClient } = require('@supabase/supabase-js');
 const http = require('http');
 const { Server } = require('socket.io');
+const fs = require('fs');
+const path = require('path');
 
 dotenv.config();
 
@@ -44,52 +46,141 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'Backend is running perfectly with Socket.io!' });
 });
 
-// Local Secure Chat State
-// store users as: { userId: { id, name, isOnline, socketId } }
-const usersDB = new Map(); 
-const messagesDB = []; // { id, sender_id, target_id, content, timestamp }
-const offlineMessages = new Map(); // target_id -> array of message objects
+// File paths for persistence
+const usersFilePath = path.join(__dirname, 'users_db.json');
+const messagesFilePath = path.join(__dirname, 'messages_db.json');
+const offlineFilePath = path.join(__dirname, 'offline_messages_db.json');
+
+// Load persistent state
+let storedUsers = {};
+try {
+    if (fs.existsSync(usersFilePath)) {
+        storedUsers = JSON.parse(fs.readFileSync(usersFilePath, 'utf-8'));
+    }
+} catch (e) {
+    console.error('Error loading stored users:', e);
+}
+
+let messagesDB = [];
+try {
+    if (fs.existsSync(messagesFilePath)) {
+        messagesDB = JSON.parse(fs.readFileSync(messagesFilePath, 'utf-8'));
+    }
+} catch (e) {
+    console.error('Error loading stored messages:', e);
+}
+
+let offlineMessagesObj = {};
+try {
+    if (fs.existsSync(offlineFilePath)) {
+        offlineMessagesObj = JSON.parse(fs.readFileSync(offlineFilePath, 'utf-8'));
+    }
+} catch (e) {
+    console.error('Error loading stored offline messages:', e);
+}
+
+const usersDB = new Map(Object.entries(storedUsers));
+const offlineMessages = new Map(Object.entries(offlineMessagesObj));
+
+function saveData() {
+    try {
+        const usersObj = {};
+        for (const [key, value] of usersDB.entries()) {
+            usersObj[key] = { ...value, isOnline: false, socketId: null }; // Set offline by default on file save
+        }
+        fs.writeFileSync(usersFilePath, JSON.stringify(usersObj, null, 2), 'utf-8');
+        fs.writeFileSync(messagesFilePath, JSON.stringify(messagesDB, null, 2), 'utf-8');
+        
+        const offlineObj = {};
+        for (const [key, value] of offlineMessages.entries()) {
+            offlineObj[key] = value;
+        }
+        fs.writeFileSync(offlineFilePath, JSON.stringify(offlineObj, null, 2), 'utf-8');
+    } catch (e) {
+        console.error('Error saving stored data to disk:', e);
+    }
+}
+
+function broadcastUsersUpdate() {
+    const sockets = io.sockets.sockets;
+    for (const [id, socket] of sockets.entries()) {
+        const userId = socket.userId;
+        if (!userId) continue;
+        
+        const currentUser = usersDB.get(userId);
+        if (!currentUser) continue;
+        
+        const clientIp = socket.handshake.address || socket.request.connection?.remoteAddress || '127.0.0.1';
+        
+        // Filter users to only those with the same network IP environment
+        const filteredUsers = Array.from(usersDB.values()).filter(u => {
+            return u.ip === clientIp && u.id !== userId;
+        });
+        
+        socket.emit('users_update', filteredUsers);
+    }
+}
 
 io.on('connection', (socket) => {
     socket.on('login', (userData) => {
         if (!userData || !userData.id) return;
         
+        const clientIp = socket.handshake.address || socket.request.connection?.remoteAddress || '127.0.0.1';
+        const connectTime = new Date().toISOString();
+
         usersDB.set(userData.id, {
             id: userData.id,
             name: userData.name,
             isOnline: true,
-            socketId: socket.id
+            socketId: socket.id,
+            ip: clientIp,
+            connectTime: connectTime
         });
         
         // Map socket ID to user ID for disconnect handling
         socket.userId = userData.id;
 
-        // Broadcast updated user list
-        io.emit('users_update', Array.from(usersDB.values()));
+        saveData();
 
-        // Send offline messages if any
+        // Inform user of their login success and active IP context
+        socket.emit('login_success', { ip: clientIp });
+
+        // Broadcast updated user list within the same IP scope
+        broadcastUsersUpdate();
+
+        // Send offline messages if any from the same network IP context
         if (offlineMessages.has(userData.id)) {
-            const msgs = offlineMessages.get(userData.id);
-            msgs.forEach(msg => {
-                socket.emit('receive_message', msg);
-                messagesDB.push(msg);
-            });
-            offlineMessages.delete(userData.id);
+            const msgs = offlineMessages.get(userData.id).filter(m => m.ip === clientIp);
+            if (msgs.length > 0) {
+                socket.emit('reconnect_offline_sync', { messages: msgs });
+                msgs.forEach(msg => {
+                    socket.emit('receive_message', msg);
+                    messagesDB.push(msg);
+                });
+                offlineMessages.delete(userData.id);
+                saveData();
+            }
         }
     });
 
     socket.on('get_users', () => {
-        socket.emit('users_update', Array.from(usersDB.values()));
+        const userId = socket.userId;
+        if (!userId) return;
+        const clientIp = socket.handshake.address || socket.request.connection?.remoteAddress || '127.0.0.1';
+        const filteredUsers = Array.from(usersDB.values()).filter(u => u.ip === clientIp && u.id !== userId);
+        socket.emit('users_update', filteredUsers);
     });
     
     socket.on('get_history', (targetId) => {
         const userId = socket.userId;
         if (!userId || !targetId) return;
+        const clientIp = socket.handshake.address || socket.request.connection?.remoteAddress || '127.0.0.1';
         
-        // Get messages between userId and targetId
+        // Filter messages between userId and targetId matching the client's current IP context
         const history = messagesDB.filter(m => 
-            (m.sender_id === userId && m.target_id === targetId) ||
-            (m.sender_id === targetId && m.target_id === userId)
+            ((m.sender_id === userId && m.target_id === targetId) ||
+            (m.sender_id === targetId && m.target_id === userId)) &&
+            m.ip === clientIp
         );
         socket.emit('chat_history', { targetId, history });
     });
@@ -97,23 +188,39 @@ io.on('connection', (socket) => {
     socket.on('send_message', (message) => {
         const { sender_id, target_id, content, timestamp } = message;
         if (!sender_id || !target_id) return;
+        const clientIp = socket.handshake.address || socket.request.connection?.remoteAddress || '127.0.0.1';
 
-        const msgObj = { id: Date.now().toString(), sender_id, target_id, content, timestamp };
+        const msgObj = { id: Date.now().toString(), sender_id, target_id, content, timestamp, ip: clientIp };
         
         messagesDB.push(msgObj);
+        saveData();
         
         // Send to sender to confirm
         socket.emit('receive_message', msgObj);
 
-        // Check if target is online
+        // Check if target is online and matches the same IP environment
         const targetUser = usersDB.get(target_id);
-        if (targetUser && targetUser.isOnline && targetUser.socketId) {
+        if (targetUser && targetUser.isOnline && targetUser.socketId && targetUser.ip === clientIp) {
             io.to(targetUser.socketId).emit('receive_message', msgObj);
         } else {
-            // Store offline message
+            // Store offline message linked to client IP
             const queued = offlineMessages.get(target_id) || [];
             queued.push(msgObj);
             offlineMessages.set(target_id, queued);
+            saveData();
+        }
+    });
+
+    socket.on('update_profile', (profileData) => {
+        const userId = socket.userId;
+        if (userId && usersDB.has(userId)) {
+            const user = usersDB.get(userId);
+            user.name = profileData.name || user.name;
+            user.avatarUrl = profileData.avatarUrl || user.avatarUrl;
+            usersDB.set(userId, user);
+            
+            saveData();
+            broadcastUsersUpdate();
         }
     });
 
@@ -125,7 +232,8 @@ io.on('connection', (socket) => {
             user.socketId = null;
             usersDB.set(userId, user);
             
-            io.emit('users_update', Array.from(usersDB.values()));
+            saveData();
+            broadcastUsersUpdate();
         }
     });
 });
