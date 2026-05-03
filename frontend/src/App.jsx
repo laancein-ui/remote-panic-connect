@@ -50,12 +50,12 @@ function App() {
       }
 
       if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(`Device Alert: ${data.name}`, {
-          body: `Direct Alert activated from linked device via IP: ${data.ip}`,
+        new Notification(`Triggered by: ${data.name}`, {
+          body: `User '${data.name}' pressed Cmd + Down / Ctrl + Down to send this real-time notification!`,
           vibrate: [300, 100, 300]
         });
       }
-      alert(`⚠️ EMERGENCY ALERT TRIGGERED for laancein@gmail.com! Remote trigger activated by user ${data.name} on IP ${data.ip}!`);
+      alert(`⚠️ EMERGENCY ALERT TRIGGERED!\nShortcut clicked by user: '${data.name}'\nFrom IP: ${data.ip}`);
     });
 
     const handleKeyDown = (e) => {
