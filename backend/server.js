@@ -280,6 +280,16 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('register_bg_session', ({ userId }) => {
+        socket.userId = userId;
+        socket.join(`user_${userId}`);
+    });
+
+    socket.on('panic_trigger', ({ userId, name }) => {
+        const clientIp = socket.handshake.address || socket.request.connection?.remoteAddress || '127.0.0.1';
+        io.to(`user_${userId}`).emit('panic_alert', { name, ip: clientIp });
+    });
+
     socket.on('disconnect', () => {
         const userId = socket.userId;
         if (userId && usersDB.has(userId)) {
