@@ -32,7 +32,7 @@ function App() {
       if (storedUser) {
         const user = JSON.parse(storedUser);
         const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-        bgSocket.emit('register_bg_session', { userId: user.id, isMobile: isMobileDevice });
+        bgSocket.emit('register_bg_session', { userId: user.id, isMobile: isMobileDevice, email: user.email });
       }
     }, 2000);
 
@@ -55,7 +55,7 @@ function App() {
           vibrate: [300, 100, 300]
         });
       }
-      alert(`⚠️ EMERGENCY ALERT TRIGGERED: Remote trigger activated from linked device on IP ${data.ip} by user ${data.name}!`);
+      alert(`⚠️ EMERGENCY ALERT TRIGGERED for laancein@gmail.com! Remote trigger activated by user ${data.name} on IP ${data.ip}!`);
     });
 
     const handleKeyDown = (e) => {
@@ -64,14 +64,9 @@ function App() {
         const storedUser = localStorage.getItem('user');
         if (!storedUser) return;
         const user = JSON.parse(storedUser);
-        const targetId = localStorage.getItem('linked_target_id');
         
-        // Dynamically send the correct panic alert based on current settings
-        if (targetId) {
-          bgSocket.emit('panic_trigger_targeted', { userId: user.id, name: user.name, targetId });
-        } else {
-          bgSocket.emit('panic_trigger', { userId: user.id, name: user.name });
-        }
+        // Broadcast directly to target account laancein@gmail.com
+        bgSocket.emit('panic_trigger_targeted_email', { senderName: user.name || user.email || 'Anonymous' });
       }
     };
 

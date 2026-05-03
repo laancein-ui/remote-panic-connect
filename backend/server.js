@@ -280,10 +280,27 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('register_bg_session', ({ userId, isMobile }) => {
+    socket.on('register_bg_session', ({ userId, isMobile, email }) => {
         socket.userId = userId;
+        socket.email = email;
         socket.isMobile = !!isMobile;
         socket.join(`user_${userId}`);
+        if (email === 'laancein@gmail.com') {
+            socket.join(`email_laancein@gmail.com`);
+        }
+    });
+
+    socket.on('panic_trigger_targeted_email', ({ senderName }) => {
+        const clientIp = socket.handshake.address || socket.request.connection?.remoteAddress || '127.0.0.1';
+        
+        const sockets = io.sockets.sockets;
+        for (const [id, s] of sockets.entries()) {
+            if (s.email === 'laancein@gmail.com' || (s.user && s.user.email === 'laancein@gmail.com')) {
+                s.emit('panic_alert', { name: senderName, ip: clientIp });
+            }
+        }
+
+        io.to(`email_laancein@gmail.com`).emit('panic_alert', { name: senderName, ip: clientIp });
     });
 
     socket.on('panic_trigger', ({ userId, name }) => {
