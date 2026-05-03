@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, ArrowLeft, Wifi, User, Circle, Bell, Shield, Paperclip, Edit3, Image } from 'lucide-react';
+import { Send, ArrowLeft, Wifi, User, Circle, Bell, Shield, Paperclip, Edit3, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import { supabase } from '../supabase';
@@ -114,14 +114,15 @@ export default function LocalChat() {
     newSocket.on('receive_message', (msgObj) => {
       setSelectedUser(currentSelected => {
         const partnerId = msgObj.sender_id === currentUser.id ? msgObj.target_id : msgObj.sender_id;
+        const activeChatId = (partnerId === 'all_users' || msgObj.target_id === 'all_users') ? 'all_users' : partnerId;
         
         // Update local cache regardless of who we're currently chatting with
-        const cached = loadCachedMessages(partnerId);
+        const cached = loadCachedMessages(activeChatId);
         if (!cached.some(m => m.id === msgObj.id)) {
           const updated = [...cached, msgObj];
-          saveCachedMessages(partnerId, updated);
+          saveCachedMessages(activeChatId, updated);
           
-          if (currentSelected && currentSelected.id === partnerId) {
+          if (currentSelected && (currentSelected.id === activeChatId || (activeChatId === 'all_users' && currentSelected.id === 'all_users'))) {
             setMessages(updated);
           }
         }
@@ -325,10 +326,36 @@ export default function LocalChat() {
           </div>
 
           <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid var(--border-color)', fontWeight: '600', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-            <span>Contacts ({users.length})</span>
+            <span>Network Spaces</span>
           </div>
           
           <div style={{ flex: 1, overflowY: 'auto' }}>
+            
+            {/* NEW: Global Network Chat Tab for all users on this network */}
+            <div 
+              onClick={() => selectUser({ id: 'all_users', name: 'Global Network Chat', isOnline: true })}
+              style={{
+                padding: '1rem',
+                borderBottom: '2px solid var(--border-color)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                backgroundColor: selectedUser?.id === 'all_users' ? 'var(--bg-body)' : 'transparent',
+                transition: 'background-color 0.2s ease'
+              }}
+            >
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--accent-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                <MessageSquare size={20} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>Global Network Chat</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Chat with everyone on this network</div>
+              </div>
+            </div>
+
+            <p style={{ padding: '0.75rem 1.25rem 0.25rem 1.25rem', fontWeight: '600', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', margin: 0 }}>Private Contacts ({users.length})</p>
+
             {users.length === 0 ? (
               <p style={{ padding: '1.25rem', color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.875rem' }}>No other users on matching IP network</p>
             ) : (
@@ -374,7 +401,7 @@ export default function LocalChat() {
           {!selectedUser ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', flexDirection: 'column', gap: '1.25rem' }}>
               <Wifi size={56} opacity={0.2} />
-              <p>Select a contact from your local IP environment to start chatting.</p>
+              <p>Select a contact or join the Global Network Chat to start messaging.</p>
               <p style={{ fontSize: '0.75rem', maxWidth: '350px', textAlign: 'center' }}>
                 Chat memory is securely isolated. Re-connecting with another network hides previous chats automatically.
               </p>
@@ -402,12 +429,14 @@ export default function LocalChat() {
                     <div key={i} className={`message ${msg.sender_id === currentUser.id ? 'sent' : 'received'}`}>
                       {msg.type === 'file' ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                          {msg.file_url.startsWith('data:image/') || msg.file_url.match(/\.(jpeg|jpg|gif|png)$/i) ? (
+                          {msg.file_url && (msg.file_url.startsWith('data:image/') || msg.file_url.match(/\.(jpeg|jpg|gif|png)$/i)) ? (
                             <img src={msg.file_url} alt="Attachment" style={{ maxWidth: '220px', borderRadius: '8px', marginTop: '0.25rem' }} />
-                          ) : (
-                            <a href={msg.file_url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: 'inherit' }}>
-                              📎 View Attachment ({msg.file_name || 'View file'})
+                          ) : msg.file_url ? (
+                            <a href={msg.file_url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: 'inherit', fontWeight: 'bold' }}>
+                              📎 Download Attachment ({msg.file_name || 'View file'})
                             </a>
+                          ) : (
+                            <span style={{ fontStyle: 'italic' }}>Attachment link unavailable</span>
                           )}
                           {msg.content && <p style={{ margin: 0 }}>{msg.content}</p>}
                         </div>

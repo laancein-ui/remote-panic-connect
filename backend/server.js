@@ -176,25 +176,50 @@ io.on('connection', (socket) => {
         if (!userId || !targetId) return;
         const clientIp = socket.handshake.address || socket.request.connection?.remoteAddress || '127.0.0.1';
         
-        // Filter messages between userId and targetId matching the client's current IP context
-        const history = messagesDB.filter(m => 
-            ((m.sender_id === userId && m.target_id === targetId) ||
-            (m.sender_id === targetId && m.target_id === userId)) &&
-            m.ip === clientIp
-        );
+        // Filter messages between userId and targetId or matching the group chat targetId
+        const history = messagesDB.filter(m => {
+            if (targetId === 'all_users') {
+                return m.target_id === 'all_users' && m.ip === clientIp;
+            }
+            return ((m.sender_id === userId && m.target_id === targetId) ||
+                   (m.sender_id === targetId && m.target_id === userId)) &&
+                   m.ip === clientIp;
+        });
         socket.emit('chat_history', { targetId, history });
     });
 
     socket.on('send_message', (message) => {
-        const { sender_id, target_id, content, timestamp } = message;
+        const { sender_id, target_id, content, timestamp, type, file_url, file_name } = message;
         if (!sender_id || !target_id) return;
         const clientIp = socket.handshake.address || socket.request.connection?.remoteAddress || '127.0.0.1';
 
-        const msgObj = { id: Date.now().toString(), sender_id, target_id, content, timestamp, ip: clientIp };
+        const msgObj = { 
+            id: Date.now().toString(), 
+            sender_id, 
+            target_id, 
+            content, 
+            timestamp, 
+            type: type || 'text',
+            file_url: file_url || null,
+            file_name: file_name || null,
+            ip: clientIp 
+        };
         
         messagesDB.push(msgObj);
         saveData();
         
+        // Check if target is 'all_users' to broadcast to the network
+        if (target_id === 'all_users') {
+            const sockets = io.sockets.sockets;
+            for (const [id, s] of sockets.entries()) {
+                const sIp = s.handshake.address || s.request.connection?.remoteAddress || '127.0.0.1';
+                if (sIp === clientIp) {
+                    s.emit('receive_message', msgObj);
+                }
+            }
+            return;
+        }
+
         // Send to sender to confirm
         socket.emit('receive_message', msgObj);
 
