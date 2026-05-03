@@ -15,6 +15,14 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
+  const requestPermission = () => {
+    if ('Notification' in window) {
+      Notification.requestPermission().then((perm) => {
+        alert(`Notification status: ${perm}`);
+      });
+    }
+  };
+
   useEffect(() => {
     let serverUrl = import.meta.env.VITE_API_URL;
     if (!serverUrl) {
@@ -85,6 +93,27 @@ function App() {
   return (
     <Router>
       <div className="app-container">
+        {('Notification' in window && Notification.permission !== 'granted') && (
+          <div style={{
+            backgroundColor: 'var(--accent-color)',
+            color: 'white',
+            padding: '12px',
+            textAlign: 'center',
+            fontSize: '0.95rem',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            position: 'sticky',
+            top: 0,
+            zIndex: 1000
+          }} onClick={requestPermission}>
+            <span>🔔 Click here to Enable Desktop/Mobile Emergency Alert Notifications</span>
+          </div>
+        )}
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/register" element={<Register />} />
