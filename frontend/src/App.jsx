@@ -32,7 +32,13 @@ function App() {
         serverUrl = 'https://panic-chat-backend.onrender.com';
       }
     }
-    const bgSocket = io(serverUrl);
+    const bgSocket = io(serverUrl, {
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000
+    });
 
     // Continuous user session tracking
     const intervalId = setInterval(() => {
@@ -57,13 +63,15 @@ function App() {
         console.error('Audio chime failed:', e);
       }
 
+      const timeStr = new Date().toLocaleTimeString();
+
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification(`Triggered by: ${data.name}`, {
-          body: `User '${data.name}' pressed Cmd + Down / Ctrl + Down to send this real-time notification!`,
+          body: `Time: ${timeStr} - User '${data.name}' pressed Cmd + Down / Ctrl + Down`,
           vibrate: [300, 100, 300]
         });
       }
-      alert(`⚠️ EMERGENCY ALERT TRIGGERED!\nShortcut clicked by user: '${data.name}'\nFrom IP: ${data.ip}`);
+      alert(`⚠️ EMERGENCY ALERT TRIGGERED!\nTime: ${timeStr}\nShortcut clicked by user: '${data.name}'\nFrom IP: ${data.ip}`);
     });
 
     const handleKeyDown = (e) => {
