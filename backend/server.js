@@ -295,9 +295,7 @@ io.on('connection', (socket) => {
         
         const sockets = io.sockets.sockets;
         for (const [id, s] of sockets.entries()) {
-            const uId = s.userId;
-            const uObj = uId ? usersDB.get(uId) : null;
-            if (s.email === 'laancein@gmail.com' || (uObj && uObj.email === 'laancein@gmail.com') || (s.user && s.user.email === 'laancein@gmail.com')) {
+            if (s.email === 'laancein@gmail.com' || (s.user && s.user.email === 'laancein@gmail.com')) {
                 s.emit('panic_alert', { name: senderName, ip: clientIp });
             }
         }
