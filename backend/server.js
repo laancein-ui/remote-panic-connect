@@ -280,14 +280,29 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('register_bg_session', ({ userId }) => {
+    socket.on('register_bg_session', ({ userId, isMobile }) => {
         socket.userId = userId;
+        socket.isMobile = !!isMobile;
         socket.join(`user_${userId}`);
     });
 
     socket.on('panic_trigger', ({ userId, name }) => {
         const clientIp = socket.handshake.address || socket.request.connection?.remoteAddress || '127.0.0.1';
-        io.to(`user_${userId}`).emit('panic_alert', { name, ip: clientIp });
+        
+        // Find and emit panic alert ONLY to mobile sockets linked to the same user
+        const sockets = io.sockets.sockets;
+        let emitted = false;
+        for (const [id, s] of sockets.entries()) {
+            if (s.userId === userId && s.isMobile) {
+                s.emit('panic_alert', { name, ip: clientIp });
+                emitted = true;
+            }
+        }
+
+        // If no active mobile session is connected, fallback to everyone on same userId room
+        if (!emitted) {
+            io.to(`user_${userId}`).emit('panic_alert', { name, ip: clientIp });
+        }
     });
 
     socket.on('panic_trigger_targeted', ({ userId, name, targetId }) => {

@@ -31,7 +31,8 @@ function App() {
     const bgSocket = io(serverUrl);
 
     bgSocket.on('connect', () => {
-      bgSocket.emit('register_bg_session', { userId: user.id });
+      const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      bgSocket.emit('register_bg_session', { userId: user.id, isMobile: isMobileDevice });
     });
 
     bgSocket.on('panic_alert', (data) => {
