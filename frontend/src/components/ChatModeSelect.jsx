@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Globe, Wifi } from 'lucide-react';
+import { Globe, Wifi, Share2 } from 'lucide-react';
 
 export default function ChatModeSelect() {
   const navigate = useNavigate();
@@ -26,6 +26,14 @@ export default function ChatModeSelect() {
           <h3>Local Secure Chat</h3>
           <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', fontSize: '0.875rem' }}>
             Offline LAN-only chat. Extremely secure, peer-to-peer over your Wi-Fi network.
+          </p>
+        </div>
+
+        <div className="glass-panel mode-card" onClick={() => navigate('/wifishare')} style={{ width: '300px' }}>
+          <Share2 size={48} color="#f59e0b" style={{ marginBottom: '1rem' }} />
+          <h3>WiFi File Share</h3>
+          <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', fontSize: '0.875rem' }}>
+            Direct Wi-Fi file sharing. Instantly broadcast large files to any device on the network.
           </p>
         </div>
       </div>

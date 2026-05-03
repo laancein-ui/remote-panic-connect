@@ -4,6 +4,7 @@ import Register from './components/Register';
 import ChatModeSelect from './components/ChatModeSelect';
 import GlobalChat from './components/GlobalChat';
 import LocalChat from './components/LocalChat';
+import WiFiShare from './components/WiFiShare';
 import './index.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -21,6 +22,7 @@ function App() {
           <Route path="/modes" element={<ProtectedRoute><ChatModeSelect /></ProtectedRoute>} />
           <Route path="/global" element={<ProtectedRoute><GlobalChat /></ProtectedRoute>} />
           <Route path="/local" element={<ProtectedRoute><LocalChat /></ProtectedRoute>} />
+          <Route path="/wifishare" element={<ProtectedRoute><WiFiShare /></ProtectedRoute>} />
         </Routes>
       </div>
     </Router>

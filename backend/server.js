@@ -121,7 +121,38 @@ function broadcastUsersUpdate() {
     }
 }
 
+let sharedFilesDB = [];
+
 io.on('connection', (socket) => {
+    socket.on('share_file', (fileData) => {
+        const clientIp = socket.handshake.address || socket.request.connection?.remoteAddress || '127.0.0.1';
+        const fileObj = {
+            id: Date.now().toString(),
+            sender_id: socket.userId || 'anon',
+            sender_name: fileData.sender_name || 'Anonymous',
+            file_name: fileData.file_name,
+            file_url: fileData.file_url,
+            size: fileData.size || 'Unknown',
+            timestamp: new Date().toISOString(),
+            ip: clientIp
+        };
+        sharedFilesDB.push(fileObj);
+        
+        // Broadcast to everyone on same network IP
+        const sockets = io.sockets.sockets;
+        for (const [id, s] of sockets.entries()) {
+            const sIp = s.handshake.address || s.request.connection?.remoteAddress || '127.0.0.1';
+            if (sIp === clientIp) {
+                s.emit('shared_files_update', sharedFilesDB.filter(f => f.ip === clientIp));
+            }
+        }
+    });
+
+    socket.on('get_shared_files', () => {
+        const clientIp = socket.handshake.address || socket.request.connection?.remoteAddress || '127.0.0.1';
+        const filtered = sharedFilesDB.filter(f => f.ip === clientIp);
+        socket.emit('shared_files_update', filtered);
+    });
     socket.on('login', (userData) => {
         if (!userData || !userData.id) return;
         
