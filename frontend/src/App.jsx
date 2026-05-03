@@ -16,10 +16,6 @@ const ProtectedRoute = ({ children }) => {
 
 function App() {
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) return;
-    const user = JSON.parse(storedUser);
-
     let serverUrl = import.meta.env.VITE_API_URL;
     if (!serverUrl) {
       if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
@@ -30,18 +26,22 @@ function App() {
     }
     const bgSocket = io(serverUrl);
 
-    bgSocket.on('connect', () => {
-      const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      bgSocket.emit('register_bg_session', { userId: user.id, isMobile: isMobileDevice });
-    });
+    // Continuous user session tracking
+    const intervalId = setInterval(() => {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        bgSocket.emit('register_bg_session', { userId: user.id, isMobile: isMobileDevice });
+      }
+    }, 2000);
 
     bgSocket.on('panic_alert', (data) => {
-      // Audio Chime Fallback for extreme emergency premium WOW factor
       try {
         const context = new (window.AudioContext || window.webkitAudioContext)();
         const osc = context.createOscillator();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(880, context.currentTime); // High pitch
+        osc.frequency.setValueAtTime(880, context.currentTime);
         osc.connect(context.destination);
         osc.start();
         osc.stop(context.currentTime + 1.25);
@@ -61,7 +61,12 @@ function App() {
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowDown') {
         e.preventDefault();
+        const storedUser = localStorage.getItem('user');
+        if (!storedUser) return;
+        const user = JSON.parse(storedUser);
         const targetId = localStorage.getItem('linked_target_id');
+        
+        // Dynamically send the correct panic alert based on current settings
         if (targetId) {
           bgSocket.emit('panic_trigger_targeted', { userId: user.id, name: user.name, targetId });
         } else {
@@ -76,6 +81,7 @@ function App() {
     }
 
     return () => {
+      clearInterval(intervalId);
       window.removeEventListener('keydown', handleKeyDown);
       bgSocket.disconnect();
     };
