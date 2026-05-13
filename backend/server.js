@@ -82,6 +82,9 @@ try {
 const usersDB = new Map(Object.entries(storedUsers));
 const offlineMessages = new Map(Object.entries(offlineMessagesObj));
 
+// In-memory alert history (last 200 entries)
+const alertHistory = [];
+
 function saveData() {
     try {
         const usersObj = {};
@@ -290,17 +293,32 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('panic_trigger_targeted_email', ({ senderName }) => {
+    socket.on('panic_trigger_targeted_email', ({ senderName, senderId }) => {
         const clientIp = socket.handshake.address || socket.request.connection?.remoteAddress || '127.0.0.1';
-        
+        const triggeredAt = new Date().toISOString();
+
+        // Log to alert history
+        const entry = { senderName, senderId: senderId || socket.userId || 'unknown', senderIp: clientIp, triggeredAt };
+        alertHistory.unshift(entry);
+        if (alertHistory.length > 200) alertHistory.pop();
+
+        const payload = { name: senderName, senderId: entry.senderId, ip: clientIp, triggeredAt };
+
         const sockets = io.sockets.sockets;
         for (const [id, s] of sockets.entries()) {
             if (s.email === 'laancein@gmail.com' || (s.user && s.user.email === 'laancein@gmail.com')) {
-                s.emit('panic_alert', { name: senderName, ip: clientIp });
+                s.emit('panic_alert', payload);
             }
         }
 
-        io.to(`email_laancein@gmail.com`).emit('panic_alert', { name: senderName, ip: clientIp });
+        io.to(`email_laancein@gmail.com`).emit('panic_alert', payload);
+    });
+
+    socket.on('get_alert_history', () => {
+        // Only serve history to the laancein@gmail.com account
+        if (socket.email === 'laancein@gmail.com') {
+            socket.emit('alert_history', alertHistory);
+        }
     });
 
     socket.on('panic_trigger', ({ userId, name }) => {

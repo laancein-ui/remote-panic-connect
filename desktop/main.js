@@ -15,8 +15,8 @@ function createWindow () {
     }
   });
 
-  // Directly load the live Vercel frontend URL
-  win.loadURL('https://remote-panic-connect-2uje.vercel.app');
+  // Directly load the live Cloudflare Pages frontend URL
+  win.loadURL('https://panic-connect-frontend.pages.dev');
 
   // Initialize background socket listener
   socket = io('https://panic-chat-backend.onrender.com');
