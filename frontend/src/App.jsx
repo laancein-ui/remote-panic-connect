@@ -50,14 +50,13 @@ function App() {
         navigator.vibrate([300, 100, 300]);
       }
       
-      // Ensure AudioContext is alive or recreate it
-      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (AudioCtx) audioCtxRef.current = new AudioCtx();
-      }
-
       const ctx = audioCtxRef.current;
       if (ctx) {
+        // Force resume if interrupted (common on mobile)
+        if (ctx.state === 'suspended' || ctx.state === 'interrupted') {
+          ctx.resume();
+        }
+
         const playBell = () => {
           const now = ctx.currentTime;
           const osc1 = ctx.createOscillator();
@@ -65,28 +64,35 @@ function App() {
           const gainNode = ctx.createGain();
           osc1.type = 'square';
           osc2.type = 'sawtooth';
+          
+          // Urgent siren tones
           osc1.frequency.setValueAtTime(880, now);
           osc1.frequency.exponentialRampToValueAtTime(440, now + 0.25);
           osc1.frequency.exponentialRampToValueAtTime(880, now + 0.5);
           osc1.frequency.exponentialRampToValueAtTime(440, now + 0.75);
           osc1.frequency.exponentialRampToValueAtTime(880, now + 1.0);
+          
           osc2.frequency.setValueAtTime(1760, now);
           osc2.frequency.exponentialRampToValueAtTime(880, now + 0.25);
           osc2.frequency.exponentialRampToValueAtTime(1760, now + 0.5);
           osc2.frequency.exponentialRampToValueAtTime(880, now + 0.75);
           osc2.frequency.exponentialRampToValueAtTime(1760, now + 1.0);
-          gainNode.gain.setValueAtTime(0.5, now);
-          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 1.2);
+          
+          gainNode.gain.setValueAtTime(0.8, now); // Increased volume
+          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 1.1);
+          
           osc1.connect(gainNode);
           osc2.connect(gainNode);
           gainNode.connect(ctx.destination);
+          
           osc1.start(now);
           osc2.start(now);
           osc1.stop(now + 1.2);
           osc2.stop(now + 1.2);
         };
+        
         if (ctx.state === 'suspended') {
-          ctx.resume().then(playBell);
+          ctx.resume().then(playBell).catch(e => console.error("Audio resume failed:", e));
         } else {
           playBell();
         }
@@ -116,26 +122,25 @@ function App() {
   };
 
   useEffect(() => {
-    // Audio Context Setup
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (AudioCtx && !audioCtxRef.current) {
-      audioCtxRef.current = new AudioCtx();
-    }
-
-    const unlockAudio = () => {
-      if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+    const initAudio = () => {
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new AudioCtx();
+      }
+      if (audioCtxRef.current.state === 'suspended') {
         audioCtxRef.current.resume();
       }
     };
 
-    window.addEventListener('click', unlockAudio);
-    window.addEventListener('touchstart', unlockAudio);
-    window.addEventListener('keydown', unlockAudio);
+    // Aggressive unlocking on any user gesture to satisfy browser policies
+    window.addEventListener('click', initAudio, { passive: true });
+    window.addEventListener('touchstart', initAudio, { passive: true });
+    window.addEventListener('keydown', initAudio, { passive: true });
 
     return () => {
-      window.removeEventListener('click', unlockAudio);
-      window.removeEventListener('touchstart', unlockAudio);
-      window.removeEventListener('keydown', unlockAudio);
+      window.removeEventListener('click', initAudio);
+      window.removeEventListener('touchstart', initAudio);
+      window.removeEventListener('keydown', initAudio);
     };
   }, []);
 
