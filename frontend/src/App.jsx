@@ -49,38 +49,37 @@ function App() {
       if ('vibrate' in navigator) {
         navigator.vibrate([300, 100, 300]);
       }
+      
+      // Ensure AudioContext is alive or recreate it
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) audioCtxRef.current = new AudioCtx();
+      }
+
       const ctx = audioCtxRef.current;
       if (ctx) {
         const playBell = () => {
-          // Urgent Dual-Tone Siren
           const now = ctx.currentTime;
-          
           const osc1 = ctx.createOscillator();
           const osc2 = ctx.createOscillator();
           const gainNode = ctx.createGain();
-
           osc1.type = 'square';
           osc2.type = 'sawtooth';
-
           osc1.frequency.setValueAtTime(880, now);
           osc1.frequency.exponentialRampToValueAtTime(440, now + 0.25);
           osc1.frequency.exponentialRampToValueAtTime(880, now + 0.5);
           osc1.frequency.exponentialRampToValueAtTime(440, now + 0.75);
           osc1.frequency.exponentialRampToValueAtTime(880, now + 1.0);
-
           osc2.frequency.setValueAtTime(1760, now);
           osc2.frequency.exponentialRampToValueAtTime(880, now + 0.25);
           osc2.frequency.exponentialRampToValueAtTime(1760, now + 0.5);
           osc2.frequency.exponentialRampToValueAtTime(880, now + 0.75);
           osc2.frequency.exponentialRampToValueAtTime(1760, now + 1.0);
-
           gainNode.gain.setValueAtTime(0.5, now);
           gainNode.gain.exponentialRampToValueAtTime(0.01, now + 1.2);
-
           osc1.connect(gainNode);
           osc2.connect(gainNode);
           gainNode.connect(ctx.destination);
-
           osc1.start(now);
           osc2.start(now);
           osc1.stop(now + 1.2);
@@ -92,20 +91,20 @@ function App() {
           playBell();
         }
       }
-      // No blocking alert on sender side to allow continuous clicking
-      // The audio/vibration already provide instant feedback
     };
 
+    // Trigger local feedback IMMEDIATELY for zero-latency feel
+    playLocalAlert();
+
+    // Then handle the network emission
     if (!socket.connected) {
       socket.connect();
       socket.once('connect', () => {
         registerSession();
         emit();
-        playLocalAlert();
       });
     } else {
       emit();
-      playLocalAlert();
     }
   };
 
