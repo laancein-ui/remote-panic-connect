@@ -59,36 +59,32 @@ function App() {
 
         const playBell = () => {
           const now = ctx.currentTime;
-          const osc1 = ctx.createOscillator();
-          const osc2 = ctx.createOscillator();
-          const gainNode = ctx.createGain();
-          osc1.type = 'square';
-          osc2.type = 'sawtooth';
-          
-          // Urgent siren tones
-          osc1.frequency.setValueAtTime(880, now);
-          osc1.frequency.exponentialRampToValueAtTime(440, now + 0.25);
-          osc1.frequency.exponentialRampToValueAtTime(880, now + 0.5);
-          osc1.frequency.exponentialRampToValueAtTime(440, now + 0.75);
-          osc1.frequency.exponentialRampToValueAtTime(880, now + 1.0);
-          
-          osc2.frequency.setValueAtTime(1760, now);
-          osc2.frequency.exponentialRampToValueAtTime(880, now + 0.25);
-          osc2.frequency.exponentialRampToValueAtTime(1760, now + 0.5);
-          osc2.frequency.exponentialRampToValueAtTime(880, now + 0.75);
-          osc2.frequency.exponentialRampToValueAtTime(1760, now + 1.0);
-          
-          gainNode.gain.setValueAtTime(0.8, now); // Increased volume
-          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 1.1);
-          
-          osc1.connect(gainNode);
-          osc2.connect(gainNode);
-          gainNode.connect(ctx.destination);
-          
-          osc1.start(now);
-          osc2.start(now);
-          osc1.stop(now + 1.2);
-          osc2.stop(now + 1.2);
+          // Resonant Bell Sound (Multiple Harmonics)
+          const frequencies = [523.25, 783.99, 1046.50, 1567.98]; // C5, G5, C6, G6
+          frequencies.forEach((freq, index) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now);
+            const decay = 1.5 - (index * 0.2);
+            gain.gain.setValueAtTime(0.5 / (index + 1), now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + decay);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + decay);
+          });
+          // Initial strike
+          const strike = ctx.createOscillator();
+          const strikeGain = ctx.createGain();
+          strike.type = 'square';
+          strike.frequency.setValueAtTime(200, now);
+          strikeGain.gain.setValueAtTime(0.2, now);
+          strikeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+          strike.connect(strikeGain);
+          strikeGain.connect(ctx.destination);
+          strike.start(now);
+          strike.stop(now + 0.1);
         };
         
         if (ctx.state === 'suspended') {
@@ -182,40 +178,33 @@ function App() {
       const ctx = audioCtxRef.current;
       if (ctx) {
         const playBell = () => {
-          // Urgent Dual-Tone Siren
           const now = ctx.currentTime;
-          
-          const osc1 = ctx.createOscillator();
-          const osc2 = ctx.createOscillator();
-          const gainNode = ctx.createGain();
-
-          osc1.type = 'square'; // Sharper sound for urgency
-          osc2.type = 'sawtooth'; // Piercing frequency
-
-          // Alternating tones for siren effect
-          osc1.frequency.setValueAtTime(880, now); // A5
-          osc1.frequency.exponentialRampToValueAtTime(440, now + 0.25);
-          osc1.frequency.exponentialRampToValueAtTime(880, now + 0.5);
-          osc1.frequency.exponentialRampToValueAtTime(440, now + 0.75);
-          osc1.frequency.exponentialRampToValueAtTime(880, now + 1.0);
-
-          osc2.frequency.setValueAtTime(1760, now); // A6
-          osc2.frequency.exponentialRampToValueAtTime(880, now + 0.25);
-          osc2.frequency.exponentialRampToValueAtTime(1760, now + 0.5);
-          osc2.frequency.exponentialRampToValueAtTime(880, now + 0.75);
-          osc2.frequency.exponentialRampToValueAtTime(1760, now + 1.0);
-
-          gainNode.gain.setValueAtTime(0.5, now);
-          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 1.2);
-
-          osc1.connect(gainNode);
-          osc2.connect(gainNode);
-          gainNode.connect(ctx.destination);
-
-          osc1.start(now);
-          osc2.start(now);
-          osc1.stop(now + 1.2);
-          osc2.stop(now + 1.2);
+          // Resonant Bell Sound (Multiple Harmonics)
+          const frequencies = [523.25, 783.99, 1046.50, 1567.98];
+          frequencies.forEach((freq, index) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now);
+            const decay = 1.5 - (index * 0.2);
+            gain.gain.setValueAtTime(0.5 / (index + 1), now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + decay);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + decay);
+          });
+          // Initial strike
+          const strike = ctx.createOscillator();
+          const strikeGain = ctx.createGain();
+          strike.type = 'square';
+          strike.frequency.setValueAtTime(200, now);
+          strikeGain.gain.setValueAtTime(0.2, now);
+          strikeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+          strike.connect(strikeGain);
+          strikeGain.connect(ctx.destination);
+          strike.start(now);
+          strike.stop(now + 0.1);
         };
 
         if (ctx.state === 'suspended') {
