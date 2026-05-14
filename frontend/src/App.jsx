@@ -52,22 +52,39 @@ function App() {
       const ctx = audioCtxRef.current;
       if (ctx) {
         const playBell = () => {
-          const osc = ctx.createOscillator();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(1046.5, ctx.currentTime);
+          // Urgent Dual-Tone Siren
+          const now = ctx.currentTime;
+          
+          const osc1 = ctx.createOscillator();
           const osc2 = ctx.createOscillator();
-          osc2.type = 'sine';
-          osc2.frequency.setValueAtTime(2093.0, ctx.currentTime);
           const gainNode = ctx.createGain();
-          gainNode.gain.setValueAtTime(1, ctx.currentTime);
-          gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
-          osc.connect(gainNode);
+
+          osc1.type = 'square';
+          osc2.type = 'sawtooth';
+
+          osc1.frequency.setValueAtTime(880, now);
+          osc1.frequency.exponentialRampToValueAtTime(440, now + 0.25);
+          osc1.frequency.exponentialRampToValueAtTime(880, now + 0.5);
+          osc1.frequency.exponentialRampToValueAtTime(440, now + 0.75);
+          osc1.frequency.exponentialRampToValueAtTime(880, now + 1.0);
+
+          osc2.frequency.setValueAtTime(1760, now);
+          osc2.frequency.exponentialRampToValueAtTime(880, now + 0.25);
+          osc2.frequency.exponentialRampToValueAtTime(1760, now + 0.5);
+          osc2.frequency.exponentialRampToValueAtTime(880, now + 0.75);
+          osc2.frequency.exponentialRampToValueAtTime(1760, now + 1.0);
+
+          gainNode.gain.setValueAtTime(0.5, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 1.2);
+
+          osc1.connect(gainNode);
           osc2.connect(gainNode);
           gainNode.connect(ctx.destination);
-          osc.start();
-          osc2.start();
-          osc.stop(ctx.currentTime + 1.5);
-          osc2.stop(ctx.currentTime + 1.5);
+
+          osc1.start(now);
+          osc2.start(now);
+          osc1.stop(now + 1.2);
+          osc2.stop(now + 1.2);
         };
         if (ctx.state === 'suspended') {
           ctx.resume().then(playBell);
@@ -161,22 +178,40 @@ function App() {
       const ctx = audioCtxRef.current;
       if (ctx) {
         const playBell = () => {
-          const osc = ctx.createOscillator();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(1046.50, ctx.currentTime);
+          // Urgent Dual-Tone Siren
+          const now = ctx.currentTime;
+          
+          const osc1 = ctx.createOscillator();
           const osc2 = ctx.createOscillator();
-          osc2.type = 'sine';
-          osc2.frequency.setValueAtTime(2093.00, ctx.currentTime);
           const gainNode = ctx.createGain();
-          gainNode.gain.setValueAtTime(1, ctx.currentTime);
-          gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
-          osc.connect(gainNode);
+
+          osc1.type = 'square'; // Sharper sound for urgency
+          osc2.type = 'sawtooth'; // Piercing frequency
+
+          // Alternating tones for siren effect
+          osc1.frequency.setValueAtTime(880, now); // A5
+          osc1.frequency.exponentialRampToValueAtTime(440, now + 0.25);
+          osc1.frequency.exponentialRampToValueAtTime(880, now + 0.5);
+          osc1.frequency.exponentialRampToValueAtTime(440, now + 0.75);
+          osc1.frequency.exponentialRampToValueAtTime(880, now + 1.0);
+
+          osc2.frequency.setValueAtTime(1760, now); // A6
+          osc2.frequency.exponentialRampToValueAtTime(880, now + 0.25);
+          osc2.frequency.exponentialRampToValueAtTime(1760, now + 0.5);
+          osc2.frequency.exponentialRampToValueAtTime(880, now + 0.75);
+          osc2.frequency.exponentialRampToValueAtTime(1760, now + 1.0);
+
+          gainNode.gain.setValueAtTime(0.5, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, now + 1.2);
+
+          osc1.connect(gainNode);
           osc2.connect(gainNode);
           gainNode.connect(ctx.destination);
-          osc.start();
-          osc2.start();
-          osc.stop(ctx.currentTime + 1.5);
-          osc2.stop(ctx.currentTime + 1.5);
+
+          osc1.start(now);
+          osc2.start(now);
+          osc1.stop(now + 1.2);
+          osc2.stop(now + 1.2);
         };
 
         if (ctx.state === 'suspended') {
