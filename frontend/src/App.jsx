@@ -75,7 +75,8 @@ function App() {
           playBell();
         }
       }
-      alert(`⚠️ Emergency Alert sent by ${senderName}`);
+      // No blocking alert on sender side to allow continuous clicking
+      // The audio/vibration already provide instant feedback
     };
 
     if (!socket.connected) {
@@ -185,10 +186,8 @@ function App() {
         }
       }
 
-      // Small delay before blocking alert to ensure sound starts properly
-      setTimeout(() => {
-        alert(`⚠️ Emergency Alert: ${data.name}\nIP: ${data.ip}`);
-      }, 50);
+      // Replace blocking alert with premium non-blocking AlertBanner
+      setActiveAlert(data);
     });
 
     window.addEventListener('keydown', handleKeyDown);
