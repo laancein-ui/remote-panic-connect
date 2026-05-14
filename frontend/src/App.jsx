@@ -243,22 +243,74 @@ function App() {
 
   return (
     <Router>
-      <div className="app-container">
+      <div className="app-container" style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+        color: '#f8fafc',
+        fontFamily: "'Inter', sans-serif"
+      }}>
         <AlertBanner alert={activeAlert} onClose={() => setActiveAlert(null)} />
-        <button onClick={triggerAlert} style={{
-          margin: '0.5rem',
-          padding: '0.5rem 1rem',
-          backgroundColor: '#d9534f',
-          color: '#fff',
-          border: 'none',
-          borderRadius: '0.4rem',
-          cursor: 'pointer',
-          fontWeight: '600',
-          position: 'relative',
-          zIndex: 1000
+        
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2rem',
+          gap: '1.5rem'
         }}>
-          Emergency Alert (CMD + DOWN)
-        </button>
+          <div className="premium-card" style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '1.5rem',
+            padding: '2rem',
+            textAlign: 'center',
+            maxWidth: '500px',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.3)'
+          }}>
+            <h1 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '0.5rem', background: 'linear-gradient(to right, #f87171, #ef4444)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              Panic Connect
+            </h1>
+            <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginBottom: '1.5rem' }}>
+              Real-time emergency synchronization across all your devices.
+            </p>
+            
+            <button 
+              onClick={triggerAlert} 
+              className="panic-button-premium"
+              style={{
+                background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '1rem',
+                padding: '1.25rem 2.5rem',
+                fontSize: '1.1rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 10px 25px rgba(239, 68, 68, 0.4)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '0.25rem',
+                margin: '0 auto'
+              }}
+            >
+              <span>Emergency Alert</span>
+              <span style={{ fontSize: '0.75rem', opacity: 0.8, fontWeight: 500 }}>CMD + DOWN</span>
+            </button>
+
+            <div style={{ marginTop: '2rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem' }}>
+              <p style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: '1.6', fontStyle: 'italic' }}>
+                "അടിയന്തര സാഹചര്യത്തിൽ മുന്നറിയിപ്പ് നൽകാൻ ഈ ബട്ടൺ അമർത്തുക. laancein@gmail.com അക്കൗണ്ടിലുള്ള എല്ലാ ഉപകരണങ്ങളിലും തൽക്ഷണം സൈറൺ ലഭിക്കും."
+              </p>
+            </div>
+          </div>
+        </div>
+
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/register" element={<Register />} />
